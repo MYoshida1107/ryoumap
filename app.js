@@ -336,7 +336,8 @@ async function updateData(force) {
 
 /* ---------- 地形図の範囲保存 ---------- */
 const AVG_KB = z => (z <= 14 ? 59 : z === 15 ? 35 : z === 16 ? 10 : 6);
-const MAX_TILES = 30000;
+const MAX_TILES = 150000;   // これ以上は一度に取らない（地理院サーバーへの負荷と端末容量のため）
+const CONFIRM_MB = 300;     // これを超えるときは確認を出す
 function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * (1 << z)); }
 function lat2y(lat, z) { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * (1 << z)); }
 function tilesForView(maxZ) {
@@ -352,13 +353,19 @@ function renderTileEst() {
   if ($('sheet').hidden) return;
   const { list, mb } = tilesForView(+$('selZ').value);
   const over = list.length > MAX_TILES;
-  $('tileEst').textContent = `この範囲: 約${list.length.toLocaleString()}枚・約${mb < 10 ? mb.toFixed(1) : Math.round(mb)}MB` + (over ? `（多すぎます。地図を拡大して範囲を狭めるか、詳しさを下げてください）` : '');
+  const size = mb < 10 ? mb.toFixed(1) + 'MB' : mb < 1000 ? Math.round(mb) + 'MB' : (mb / 1024).toFixed(1) + 'GB';
+  const min = Math.ceil(list.length / 15 / 60);
+  $('tileEst').textContent = `この範囲: 約${list.length.toLocaleString()}枚・約${size}` + (list.length > 2000 ? `・目安${min}分以上` : '')
+    + (over ? `（一度に保存できる上限 ${MAX_TILES.toLocaleString()}枚を超えています。範囲を分けるか、詳しさを下げてください）` : '');
   $('bTiles').disabled = over || tileJob;
 }
 let tileJob = false, tileStop = false;
 async function saveTiles() {
-  const { list } = tilesForView(+$('selZ').value);
+  const { list, mb } = tilesForView(+$('selZ').value);
   if (list.length > MAX_TILES || tileJob) return;
+  if (mb > CONFIRM_MB && !confirm(`約${list.length.toLocaleString()}枚・約${mb < 1000 ? Math.round(mb) + 'MB' : (mb / 1024).toFixed(1) + 'GB'}を保存します。\n時間がかかるので、Wi-Fiと充電のある場所で、画面を開いたままにしてください。途中で止めても、次回は続きから保存します。\n\n開始しますか？`)) return;
+  let wake = null;
+  try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) { wake = null; }   // 保存中の画面消灯を防ぐ
   tileJob = true; tileStop = false; $('bTiles').disabled = true; $('bTilesStop').hidden = false;
   const box = $('tileProg'); box.hidden = false;
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -379,6 +386,7 @@ async function saveTiles() {
   };
   await Promise.all([worker(), worker(), worker(), worker()]);
   box.textContent = (tileStop ? '中止しました。' : '完了しました。') + ` 新規保存 ${got.toLocaleString()}枚` + (fail ? `、失敗 ${fail}枚（もう一度押すと不足分だけ取り直します）` : '');
+  if (wake) wake.release().catch(() => {});
   tileJob = false; $('bTilesStop').hidden = true; renderTileEst(); renderStore();
 }
 async function renderStore() {

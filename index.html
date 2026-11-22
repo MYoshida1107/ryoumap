@@ -39,13 +39,14 @@
 
   <section>
     <h3>地形図（地理院タイル）のオフライン保存</h3>
-    <p class="small">いま画面に見えている範囲を保存します。猟場が画面に収まるように地図を動かしてから押してください。一度見た場所は自動でも保存されます。</p>
+    <p class="small">いま画面に見えている範囲を保存します。猟場が画面に収まるように地図を動かしてから押してください。一度見た場所は自動でも保存されます。保存は端末ごとです（PCで保存してもiPhoneには入りません）。</p>
+    <p class="small">「軽量」でも等高線・林道・地名は同じ内容です。未保存の拡大表示は軽量版を引き伸ばして表示します。</p>
     <div class="row">
       <label>詳しさ
         <select id="selZ">
-          <option value="15">標準（ズーム15まで）</option>
-          <option value="16" selected>詳細（ズーム16まで）</option>
-          <option value="17">最詳細（ズーム17まで）</option>
+          <option value="15" selected>軽量（ズーム15まで）</option>
+          <option value="16">くっきり（ズーム16まで・約2倍）</option>
+          <option value="17">最もくっきり（ズーム17まで・約3.5倍）</option>
         </select>
       </label>
     </div>

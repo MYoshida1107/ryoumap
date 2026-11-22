@@ -1,6 +1,6 @@
 // アプリ本体（画面とプログラム）を端末に保存し、圏外でも起動できるようにする。
 // 地図タイルと禁止区域データはアプリ側が IndexedDB に保存するので、ここでは扱わない。
-const VERSION = 'ryoumap-v1';
+const VERSION = 'ryoumap-v2';
 const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png',
   'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/images/layers.png', 'vendor/images/layers-2x.png',
   'vendor/images/marker-icon.png', 'vendor/images/marker-icon-2x.png', 'vendor/images/marker-shadow.png'];
