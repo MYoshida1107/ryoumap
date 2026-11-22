@@ -261,6 +261,26 @@ map.on('click', e => {
   L.popup({ maxWidth: 300, autoPanPadding: [20, 70] }).setLatLng(e.latlng).setContent(`<div class="pop">${hits.join('')}</div>`).openOn(map);
 });
 
+/* ---------- 長押し（PCはダブルクリック／右クリック）でその地点を外部の地図で開く ---------- */
+function pointMenu(e) {
+  const lat = e.latlng.lat.toFixed(6), lng = e.latlng.lng.toFixed(6), q = `${lat},${lng}`;
+  const html = `<div class="pop pt"><div class="big">この地点</div><div class="coord">${lat}, ${lng}</div>`
+    + `<a class="ext" href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで開く</a>`
+    + `<a class="ext" href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここまでの経路（Googleマップ）</a>`
+    + `<button class="ext" type="button" data-copy="${q}">座標をコピー</button></div>`;
+  L.popup({ maxWidth: 280, autoPanPadding: [20, 70] }).setLatLng(e.latlng).setContent(html).openOn(map);
+}
+map.on('contextmenu', pointMenu);
+if (window.matchMedia && matchMedia('(pointer: fine)').matches) {   // マウス操作の端末だけ。タッチ端末のダブルタップ拡大は残す
+  map.doubleClickZoom.disable();
+  map.on('dblclick', pointMenu);
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('[data-copy]'); if (!t) return;
+  const v = t.dataset.copy;
+  (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(() => toast('座標をコピーしました: ' + v), () => toast('コピーできませんでした: ' + v, 6000));
+});
+
 /* ---------- データ更新 ---------- */
 async function resolveUrls() {
   const urls = {};
