@@ -1,0 +1,43 @@
+html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",sans-serif;font-size:16px;color:#1b1b1b;background:#e9ece6;-webkit-text-size-adjust:100%}
+#map{position:fixed;inset:0;background:#dfe5dc}
+button,select{font:inherit}
+#btns{position:fixed;right:calc(10px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));display:flex;flex-direction:column;gap:10px;z-index:1000}
+#btns button{width:48px;height:48px;border-radius:12px;border:1px solid #9aa39a;background:#fff;font-size:24px;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.3);color:#1f3d2b}
+#btns button.on{background:#1f3d2b;color:#fff}
+#status{position:fixed;left:0;right:0;bottom:0;z-index:1000;padding:6px calc(10px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));background:rgba(255,255,255,.92);border-top:1px solid #b9c0b7;font-size:13px;display:flex;justify-content:space-between;gap:10px}
+#status.warn{background:#fff3cd}
+#status.bad{background:#f8d7da}
+#stData{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#stNet{white-space:nowrap;font-weight:700;color:#8a3b00}
+#sheet{position:fixed;z-index:2000;top:0;bottom:0;right:0;width:min(420px,100%);background:#fbfcfa;box-shadow:-2px 0 12px rgba(0,0,0,.3);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(24px + env(safe-area-inset-bottom));box-sizing:border-box}
+#sheet .head{position:sticky;top:0;background:#fbfcfa;display:flex;justify-content:space-between;align-items:center;padding:calc(12px + env(safe-area-inset-top)) 0 10px;border-bottom:1px solid #d5dad3;font-size:18px;z-index:1}
+#sheet .head button{border:0;background:none;font-size:30px;line-height:1;width:44px;height:44px;color:#333}
+section{padding:14px 0;border-bottom:1px solid #e1e5df}
+h3{margin:0 0 8px;font-size:15px;color:#1f3d2b}
+.small{font-size:13px;line-height:1.6;color:#444;margin:6px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.row button{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid #9aa39a;background:#fff;color:#1b1b1b}
+.row button.pri{background:#1f3d2b;border-color:#1f3d2b;color:#fff;font-weight:600}
+.row button.danger{color:#a11;border-color:#d8a3a3}
+.row button:disabled{opacity:.5}
+select{min-height:40px;border-radius:8px;border:1px solid #9aa39a;background:#fff;padding:0 8px;margin-left:6px}
+.prog{font-size:13px;background:#eef2ec;border-radius:8px;padding:8px 10px;margin-top:6px;white-space:pre-line}
+#layerList label{display:flex;align-items:center;gap:10px;min-height:42px;font-size:15px}
+#layerList input{width:22px;height:22px}
+#layerList .cnt{margin-left:auto;font-size:12px;color:#666}
+#layerList .opt{font-size:12px;color:#8a5a00}
+.legend{list-style:none;margin:0;padding:0;font-size:14px}
+.legend li{display:flex;align-items:center;gap:10px;min-height:28px}
+.sw{display:inline-block;width:26px;height:16px;border-radius:2px;flex:none;box-sizing:border-box}
+.ln{display:inline-block;width:26px;height:0;flex:none}
+.dot{display:inline-block;width:14px;height:14px;border-radius:50%;flex:none;box-sizing:border-box;margin:0 6px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(48px + env(safe-area-inset-bottom));z-index:3000;background:rgba(20,30,22,.92);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:86%;text-align:center}
+.leaflet-popup-content{margin:12px 14px;font-size:14px;line-height:1.5;max-height:50vh;overflow-y:auto}
+.pop h4{margin:10px 0 2px;font-size:13px;color:#1f3d2b;border-top:1px solid #ddd;padding-top:8px}
+.pop h4:first-child{border-top:0;margin-top:0;padding-top:0}
+.pop .big{font-weight:700;font-size:15px}
+.pop .ng{color:#b00020}
+.pop dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:1px 10px;font-size:13px}
+.pop dt{color:#666}.pop dd{margin:0}
+.leaflet-control-attribution{font-size:10px}
+.leaflet-bottom{bottom:calc(34px + env(safe-area-inset-bottom))}
+.me{background:#1565c0;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #1565c0,0 1px 4px rgba(0,0,0,.5);box-sizing:border-box}
