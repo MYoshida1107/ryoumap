@@ -61,9 +61,15 @@ const FIELD_LABEL = {
 let dbp;
 function db() {
   if (!dbp) dbp = new Promise((res, rej) => {
-    const r = indexedDB.open('ryoumap', 1);
-    r.onupgradeneeded = () => { r.result.createObjectStore('layers'); r.result.createObjectStore('tiles'); };
-    r.onsuccess = () => res(r.result);
+    const r = indexedDB.open('ryoumap', 2);
+    // 版を上げるときは既存のストア（保存済みの地図）を消さず、無いものだけ足す
+    r.onupgradeneeded = () => {
+      const d = r.result, has = n => d.objectStoreNames.contains(n);
+      if (!has('layers')) d.createObjectStore('layers');
+      if (!has('tiles')) d.createObjectStore('tiles');
+      if (!has('records')) d.createObjectStore('records', { keyPath: 'id' });
+    };
+    r.onsuccess = () => { r.result.onversionchange = () => r.result.close(); res(r.result); };
     r.onerror = () => rej(r.error);
   });
   return dbp;
@@ -267,7 +273,8 @@ function pointMenu(e) {
   const html = `<div class="pop pt"><div class="big">この地点</div><div class="coord">${lat}, ${lng}</div>`
     + `<a class="ext" href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで開く</a>`
     + `<a class="ext" href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここまでの経路（Googleマップ）</a>`
-    + `<button class="ext" type="button" data-copy="${q}">座標をコピー</button></div>`;
+    + `<button class="ext" type="button" data-copy="${q}">座標をコピー</button>`
+    + `<button class="ext" type="button" data-rec-add="${q}">ここに記録を追加</button></div>`;
   L.popup({ maxWidth: 280, autoPanPadding: [20, 70] }).setLatLng(e.latlng).setContent(html).openOn(map);
 }
 map.on('contextmenu', pointMenu);
@@ -479,7 +486,144 @@ $('bGps').onclick = () => {
 };
 map.on('dragstart', () => { if (follow) { follow = false; $('bGps').classList.remove('on'); } });
 
+/* ---------- 見た・獲ったの記録 ----------
+   記録は端末内（IndexedDB の records）に置く。あとでサーバーと同期できるよう、
+   記録ごとに id と更新日時を持ち、削除は消さずに「削除済み」の印を付ける。 */
+const ANIMAL = { deer: 'シカ', bear: 'クマ' }, KIND = { seen: '見た', taken: '獲った' };
+const records = new Map();            // id -> 記録（削除済みも含む）
+const recLayer = L.layerGroup().addTo(map);
+let showRecs = pref('showRecs', true), markStyle = pref('markStyle', 'pic');
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
+  : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)));
+const liveRecs = () => [...records.values()].filter(r => !r.deleted);
+
+function fmtRecTime(ms) {
+  const d = new Date(ms);
+  return (d.getFullYear() === new Date().getFullYear() ? '' : d.getFullYear() + '/') + fmtDateTime(ms);
+}
+function recLabel(r) {
+  const sex = r.kind === 'taken' && (r.male || r.female) ? `（オス${r.male || 0}・メス${r.female || 0}）` : '';
+  return `${ANIMAL[r.animal]} ${KIND[r.kind]} ${r.count}頭${sex}`;
+}
+function recIcon(r) {
+  const inner = markStyle === 'chr' ? (r.animal === 'deer' ? 'シ' : 'ク') : `<i class="ico ${r.animal}"></i>`;
+  return L.divIcon({ className: '', iconSize: [32, 32], iconAnchor: [16, 16],
+    html: `<div class="rec ${r.kind}">${inner}${r.count > 1 ? `<b>${r.count}</b>` : ''}</div>` });
+}
+// 新しい記録ほど上に描く
+function renderRecs() {
+  recLayer.clearLayers();
+  const live = liveRecs();
+  if (showRecs) live.sort((a, b) => a.t - b.t).forEach((r, i) => {
+    L.marker([r.lat, r.lng], { icon: recIcon(r), zIndexOffset: 100000 + i * 20000, keyboard: false })
+      .on('click', () => recPopup(r.id)).addTo(recLayer);
+  });
+  $('recInfo').textContent = live.length ? `この端末の記録: ${live.length}件` : 'まだ記録はありません。';
+}
+function recPopup(id) {
+  const r = records.get(id); if (!r || r.deleted) return;
+  const html = `<div class="pop pt"><div class="big">${esc(recLabel(r))}</div><div class="coord">${fmtRecTime(r.t)}</div>`
+    + (r.memo ? `<div class="memo">${esc(r.memo)}</div>` : '')
+    + `<button class="ext" type="button" data-rec-edit="${r.id}">編集</button>`
+    + `<button class="ext del" type="button" data-rec-del="${r.id}">削除</button></div>`;
+  L.popup({ maxWidth: 280, offset: [0, -10], autoPanPadding: [20, 70] }).setLatLng([r.lat, r.lng]).setContent(html).openOn(map);
+}
+async function saveRec(r) {
+  r.updatedAt = Date.now(); r.dirty = true;      // dirty = まだサーバーへ送っていない
+  records.set(r.id, r); renderRecs();
+  try { await idb('records', 'readwrite', o => o.put(r)); }
+  catch (e) { toast('記録を保存できませんでした。端末の空き容量を確認してください。', 6000); }
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+}
+function deleteRec(id) {
+  const r = records.get(id); if (!r) return;
+  r.deleted = true; map.closePopup(); return saveRec(r);
+}
+async function loadRecs() {
+  try { for (const r of await idb('records', 'readonly', o => o.getAll())) records.set(r.id, r); } catch (e) { /* 読めなければ空で始める */ }
+  renderRecs();
+}
+
+// かんたん登録：押すと十字の場所に「見た・1頭」。直後の数秒だけ出る帯で頭数などを直せる
+let qRec = null, qTimer;
+function showStrip() {
+  if (!qRec) return;
+  $('qText').textContent = recLabel(qRec) + ' を記録しました';
+  $('qKind').textContent = qRec.kind === 'seen' ? '獲った' : '見た';
+  $('qStrip').hidden = false;
+  clearTimeout(qTimer); qTimer = setTimeout(hideStrip, 8000);
+}
+function hideStrip() { clearTimeout(qTimer); $('qStrip').hidden = true; qRec = null; }
+function quickAdd(animal) {
+  const c = map.getCenter();
+  // 帯が出ている間に同じ場所で同じボタンを押したら、マークを増やさず頭数を足す
+  if (qRec && qRec.animal === animal && map.distance(c, [qRec.lat, qRec.lng]) < 30) { qRec.count = Math.min(999, qRec.count + 1); saveRec(qRec); showStrip(); return; }
+  qRec = { id: uuid(), animal, kind: 'seen', t: Date.now(), lat: +c.lat.toFixed(6), lng: +c.lng.toFixed(6), count: 1, male: 0, female: 0, memo: '', deleted: false };
+  if (!showRecs) { showRecs = true; setPref('showRecs', true); $('chkRecs').checked = true; }
+  saveRec(qRec); showStrip();
+}
+$('bDeer').onclick = () => quickAdd('deer');
+$('bBear').onclick = () => quickAdd('bear');
+$('qPlus').onclick = () => { if (!qRec) return; qRec.count = Math.min(999, qRec.count + 1); saveRec(qRec); showStrip(); };
+$('qKind').onclick = () => { if (!qRec) return; qRec.kind = qRec.kind === 'seen' ? 'taken' : 'seen'; saveRec(qRec); showStrip(); };
+$('qMore').onclick = () => { if (!qRec) return; const r = qRec; hideStrip(); openForm(r, false); };
+$('qUndo').onclick = () => { if (!qRec) return; const r = qRec; hideStrip(); deleteRec(r.id); toast('取り消しました'); };
+
+// くわしい入力（あとからの追加と、記録の編集）
+let fRec = null, fNew = false;
+const toLocalInput = ms => new Date(ms - new Date(ms).getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+function setSeg(id, v) {
+  $(id).dataset.v = v;
+  for (const b of $(id).children) b.classList.toggle('on', b.dataset.v === v);
+  if (id === 'rfKind') $('rfSex').hidden = v !== 'taken';
+}
+function openForm(r, isNew) {
+  fRec = Object.assign({}, r); fNew = isNew;
+  map.closePopup();
+  $('rfTitle').textContent = isNew ? '記録を追加' : '記録を編集';
+  setSeg('rfAnimal', r.animal); setSeg('rfKind', r.kind);
+  $('rfTime').value = toLocalInput(r.t);
+  $('rfCount').value = r.count; $('rfMale').value = r.male || 0; $('rfFemale').value = r.female || 0;
+  $('rfMemo').value = r.memo || '';
+  $('rfPos').textContent = `場所: ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}`;
+  $('rfDelete').hidden = isNew;
+  $('recForm').hidden = false;
+}
+function closeForm() { $('recForm').hidden = true; fRec = null; }
+for (const id of ['rfAnimal', 'rfKind']) $(id).addEventListener('click', e => { const v = e.target.dataset.v; if (v) setSeg(id, v); });
+$('rfCancel').onclick = closeForm;
+$('recForm').addEventListener('click', e => { if (e.target === $('recForm')) closeForm(); });
+$('rfDelete').onclick = () => {
+  if (!fRec || !confirm('この記録を削除します。よろしいですか？')) return;
+  const id = fRec.id; closeForm(); deleteRec(id); toast('記録を削除しました');
+};
+$('rf').addEventListener('submit', e => {
+  e.preventDefault(); if (!fRec) return;
+  const num = (id, min) => Math.max(min, Math.min(999, parseInt($(id).value, 10) || 0));
+  const t = new Date($('rfTime').value).getTime();
+  if (!isFinite(t)) { toast('日時を入れてください'); return; }
+  const r = fRec;
+  r.animal = $('rfAnimal').dataset.v; r.kind = $('rfKind').dataset.v; r.t = t;
+  r.male = r.kind === 'taken' ? num('rfMale', 0) : 0; r.female = r.kind === 'taken' ? num('rfFemale', 0) : 0;
+  r.count = Math.max(num('rfCount', 1), r.male + r.female);
+  r.memo = $('rfMemo').value.trim();
+  const added = fNew; closeForm(); saveRec(r); toast(added ? '記録を追加しました' : '記録を直しました');
+});
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('[data-rec-edit],[data-rec-del],[data-rec-add]'); if (!t) return;
+  if (t.dataset.recEdit) { const r = records.get(t.dataset.recEdit); if (r) openForm(r, false); }
+  else if (t.dataset.recDel) { if (confirm('この記録を削除します。よろしいですか？')) { deleteRec(t.dataset.recDel); toast('記録を削除しました'); } }
+  else {
+    const [lat, lng] = t.dataset.recAdd.split(',').map(Number);
+    openForm({ id: uuid(), animal: 'deer', kind: 'seen', t: Date.now(), lat, lng, count: 1, male: 0, female: 0, memo: '', deleted: false }, true);
+  }
+});
+$('chkRecs').checked = showRecs; $('selMark').value = markStyle;
+$('chkRecs').onchange = e => { showRecs = e.target.checked; setPref('showRecs', showRecs); renderRecs(); };
+$('selMark').onchange = e => { markStyle = e.target.value; setPref('markStyle', markStyle); renderRecs(); };
+
 /* ---------- 起動 ---------- */
+loadRecs();
 renderLayerList(); renderStatus(); renderNet();
 loadStored().then(() => { if (!meta.kinshi) $('sheet').hidden = false, renderTileEst(), renderStore(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -22,6 +22,24 @@
   <button id="bGps" aria-label="現在地">◎</button>
 </div>
 
+<div id="cross" aria-hidden="true"></div>
+
+<div id="quick">
+  <div id="qStrip" hidden>
+    <span id="qText"></span>
+    <div class="b">
+      <button id="qPlus" type="button">＋1頭</button>
+      <button id="qKind" type="button">獲った</button>
+      <button id="qMore" type="button">詳しく</button>
+      <button id="qUndo" type="button">取消</button>
+    </div>
+  </div>
+  <div id="qBtns">
+    <button id="bDeer" type="button"><i class="ico deer"></i>シカ</button>
+    <button id="bBear" type="button"><i class="ico bear"></i>クマ</button>
+  </div>
+</div>
+
 <div id="status"><span id="stData">データ未取得</span><span id="stNet"></span></div>
 
 <div id="sheet" hidden>
@@ -61,6 +79,21 @@
   </section>
 
   <section>
+    <h3>見た・獲ったの記録</h3>
+    <p class="small">地図の中央の十字の場所に記録します。下の「シカ」「クマ」を押すと、いまの時刻で「見た・1頭」が入ります。続けて同じボタンを押すと頭数が増えます。あとから足すときは、地図を長押しして「ここに記録を追加」を選びます。</p>
+    <p id="recInfo" class="small"></p>
+    <div id="recOpts">
+      <label><input type="checkbox" id="chkRecs">記録のマークを地図に出す</label>
+      <label>マークの絵
+        <select id="selMark">
+          <option value="pic">動物の絵</option>
+          <option value="chr">文字（シ・ク）</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section>
     <h3>表示レイヤー</h3>
     <div id="layerList"></div>
   </section>
@@ -80,6 +113,8 @@
       <li><i class="dot" style="background:#fff;border:3px solid #111"></i>ゲート</li>
       <li><i class="dot" style="background:#e00000;border:2px solid #fff;outline:1px solid #900"></i>通行止め</li>
       <li><i class="dot" style="background:#1565c0;border:2px solid #fff"></i>入林箱・その他</li>
+      <li><span class="rec seen lg"><i class="ico deer"></i></span>見た記録（青）</li>
+      <li><span class="rec taken lg"><i class="ico bear"></i></span>獲った記録（赤）</li>
     </ul>
   </section>
 
@@ -87,6 +122,27 @@
     <p><b>必ず確認してください：</b>このアプリは北海道森林管理局が公開している「国有林・道有林 銃猟立入禁止区域図」のデータを取得時点のまま表示するものです。公式の図は毎週更新されます。出猟前に必ず更新し、疑わしい場合は<a href="https://www.rinya.maff.go.jp/hokkaido/apply/nyurin/attach/jyuukinnzu.html" target="_blank" rel="noopener">公式ページ</a>や森林管理署で確認してください。色が塗られていない場所でも、国有林・道有林以外の土地は掲載対象外です。</p>
     <p>出典：北海道森林管理局 銃猟立入禁止区域図／国土地理院 地理院タイル</p>
   </section>
+</div>
+
+<div id="recForm" hidden>
+  <form class="card" id="rf" autocomplete="off">
+    <b id="rfTitle">記録</b>
+    <div class="seg" id="rfAnimal"><button type="button" data-v="deer">シカ</button><button type="button" data-v="bear">クマ</button></div>
+    <div class="seg" id="rfKind"><button type="button" data-v="seen">見た</button><button type="button" data-v="taken">獲った</button></div>
+    <label>日時<input type="datetime-local" id="rfTime" required></label>
+    <label>頭数<input type="number" id="rfCount" min="1" max="999" inputmode="numeric"></label>
+    <div id="rfSex">
+      <label>オス<input type="number" id="rfMale" min="0" max="999" inputmode="numeric"></label>
+      <label>メス<input type="number" id="rfFemale" min="0" max="999" inputmode="numeric"></label>
+    </div>
+    <label>メモ<textarea id="rfMemo" rows="2" maxlength="500"></textarea></label>
+    <p id="rfPos" class="small"></p>
+    <div class="row">
+      <button type="submit" class="pri">保存</button>
+      <button type="button" id="rfCancel">やめる</button>
+      <button type="button" id="rfDelete" class="danger">削除</button>
+    </div>
+  </form>
 </div>
 
 <div id="toast" hidden></div>
